@@ -1,6 +1,6 @@
 # Secure Hermes Agent Setup with Ollama (Ubuntu Sandbox)
 
-This comprehensive guide walks you through initially hardening your Ubuntu server, creating a non-root sudo user with cryptographic SSH keys, and deploying the **Nous Research Hermes AI Agent** locally with **Ollama**. It leverages **110 GB of VRAM**, secures the agent inside a **Docker sandbox**, runs under a **restricted non-root process**, and completely **isolates the container from your local home network (LAN)**.
+This comprehensive guide walks you through initially hardening your Ubuntu server, creating a non-root sudo user with cryptographic SSH keys, and deploying the **Nous Research Hermes AI Agent** locally with **Ollama**. It leverages **110 GB of VRAM** on a GMTek Evo x2, secures the agent inside a **Docker sandbox**, runs under a **restricted non-root process**, and completely **isolates the container from your local home network (LAN)**.
 
 ---
 
