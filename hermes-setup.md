@@ -1,6 +1,6 @@
 # Secure Hermes Agent Setup with Ollama (Ubuntu Sandbox)
 
-This comprehensive guide walks you through initially hardening your Ubuntu server, creating a non-root sudo user with cryptographic SSH keys, and deploying the **Nous Research Hermes AI Agent** locally with **Ollama**. It leverages **110 GB of VRAM**, secures the agent inside a **Docker sandbox**, runs under a **restricted non-root process**, and completely **isolates the container from your local home network (LAN)**.
+This comprehensive guide walks you through initially hardening your Ubuntu server, creating a non-root sudo user with cryptographic SSH keys, and deploying the **Nous Research Hermes AI Agent** locally with **Ollama**. It leverages **96 GB of VRAM**, secures the agent inside a **Docker sandbox**, runs under a **restricted non-root process**, and completely **isolates the container from your local home network (LAN)**.
 
 ---
 
@@ -15,7 +15,7 @@ sudo apt update && sudo apt upgrade -y
 ### 2. Installing Recommended Packages
 Install essential utilities for security, networking, and system monitoring.
 ```bash
-PACKAGES="ufw curl wget git ca-certificates gnupg fail2ban htop"
+PACKAGES="ufw curl wget git ca-certificates gnupg fail2ban htop unattended-upgrades vim gpg perl"
 sudo apt install -y $PACKAGES
 ```
 
@@ -98,19 +98,83 @@ sudo systemctl restart ssh
 ### 8. Install the NVIDIA Container Toolkit
 Bridge your host GPU drivers to Docker so your containers can utilize your VRAM pool. Run this block from your new admin account:
 
-```bash
-# 1. Configure the production repository
-curl -fsSL https://github.io | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-  && curl -s -L https://github.io | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-    sudo tee /etc/lists/nvidia-container-toolkit.list
+#### Install AMD ROCm Drivers and Set Permissions
 
-# 2. Update package lists and install the toolkit
+Install the AMD repository installer, compute stacks (OpenCL, HIP, [ROCm](https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=ryzen&w=compute&gpu=amd-ryzen-ai-max-395&os=ubuntu&ubuntu-ver=26.04.1&i=pkgman&gfx=gfx1151) ), and assign necessary video render permissions. Detailed installation steps and package repositories can be accessed via {Link: AMD Radeon Software https://radeon.com}.
+
+```bash
+
+# Download and install GPG key
+sudo mkdir --parents --mode=0755 /etc/apt/keyrings
+
+# ROCm release signing key
+wget https://stable.repo.amd.com/rocm/gpg/packages.gpg -O - | \
+    gpg --dearmor | sudo tee /etc/apt/keyrings/amdrocm.gpg > /dev/null
+
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/amd-container-toolkit/apt/ $(. /etc/os-release && echo $VERSION_CODENAME) main" | sudo tee /etc/apt/sources.list.d/amd-container-toolkit.list
+
+sudo tee /etc/apt/sources.list.d/amdrocm-stable.sources << EOF
+X-Repo-Id: amdrocm-stable
+Types: deb
+URIs: https://stable.repo.amd.com/rocm/core/packages/ubuntu2604/
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/amdrocm.gpg
+Enabled: yes
+EOF
+
+sudo apt update
+
+# Download and install the AMD repository installer package
+sudo apt install libatomic1 libquadmath0 jq
+sudo apt install amdrocm-core-sdk10.1-gfx1151
 sudo apt-get update
-sudo apt-get install -y nvidia-container-toolkit
+sudo apt update
+
+# 2. Update package lists and Install the full ROCm stack along with OpenCL and HIP runtimes
+# sudo amdgpu-install --usecase=rocm,opencl,hip
+
+# Add the current user to the necessary hardware access groups
+sudo usermod -aG video $USER
+sudo usermod -aG render $USER
+
+# udev rules are a flexible, system-wide approach for managing device permissions, eliminating the need for user group management while allowing granular GPU access. To enable them and grant GPU access to all users, run the following command:
+sudo tee /etc/udev/rules.d/70-amdgpu.rules << EOF
+KERNEL=="kfd", GROUP="render", MODE="0666"
+SUBSYSTEM=="drm", KERNEL=="renderD*", GROUP="render", MODE="0666"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Add ROCm to the environment PATH
+echo 'export PATH=$PATH:/opt/rocm/bin' >> ~/.bashrc
+source ~/.bashrc
+
+sudo apt install amd-container-toolkit
+sudo amd-ctk runtime configure
 
 # 3. Restart the Docker daemon to apply runtime changes
 sudo systemctl restart docker
+```
+
+Verify your installation
+Use the following ROCm tools to verify that ROCm is correctly installed and that your AMD devices are visible to the system.
+
+Use rocminfo to list detected AMD GPUs and confirm that the ROCm runtimes and drivers are correctly installed and loaded.
+
+```bash
+rocminfo
+
+docker run --runtime=amd -e AMD_VISIBLE_DEVICES=all rocm/dev-ubuntu-24.04 amd-smi monitor
+
+```
+
+Use the AMD SMI CLI amd-smi to validate system information.
+
+```bash
+amd-smi version
 ```
 
 ---
@@ -143,6 +207,20 @@ cd ~/hermes-sandbox
 
 ### 11. Create the Hardened Docker Compose Stack
 Create a configuration file that enforces the non-root execution policy (`user: "2026:2026"`) and moves both services into a custom network.
+
+https://rocm.docs.amd.com/en/latest/install/docker-containers.html
+
+# install docker for --gpus option
+# sudo apt-get install docker.io
+
+
+docker run -it --rm \
+    --device /dev/kfd \
+    --device /dev/dri \
+    --security-opt seccomp=unconfined \
+    <image>
+
+
 
 1. Open a new file:
    ```bash
