@@ -95,10 +95,8 @@ sudo systemctl restart ssh
 
 ## Part 2: Installing the Container Environment
 
-### 8. Install the NVIDIA Container Toolkit
+### 8. Install AMD ROCm Drivers and Set Permissions
 Bridge your host GPU drivers to Docker so your containers can utilize your VRAM pool. Run this block from your new admin account:
-
-#### Install AMD ROCm Drivers and Set Permissions
 
 Install the AMD repository installer, compute stacks (OpenCL, HIP, [ROCm](https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=ryzen&w=compute&gpu=amd-ryzen-ai-max-395&os=ubuntu&ubuntu-ver=26.04.1&i=pkgman&gfx=gfx1151) ), and assign necessary video render permissions. Detailed installation steps and package repositories can be accessed via {Link: AMD Radeon Software https://radeon.com}.
 
@@ -132,9 +130,6 @@ sudo apt install amdrocm-core-sdk10.1-gfx1151
 sudo apt-get update
 sudo apt update
 
-# 2. Update package lists and Install the full ROCm stack along with OpenCL and HIP runtimes
-# sudo amdgpu-install --usecase=rocm,opencl,hip
-
 # Add the current user to the necessary hardware access groups
 sudo usermod -aG video $USER
 sudo usermod -aG render $USER
@@ -152,10 +147,24 @@ sudo udevadm trigger
 echo 'export PATH=$PATH:/opt/rocm/bin' >> ~/.bashrc
 source ~/.bashrc
 
-sudo apt install amd-container-toolkit
-sudo amd-ctk runtime configure
+wget https://repo.radeon.com/amdgpu/latest/ubuntu/pool/main/a/amdgpu-install/amdgpu-install_31.60.0.0.31600000-2407772.26.04_all.deb
+--2026-10-31 16:25:39--  https://repo.radeon.com/amdgpu/latest/ubuntu/pool/main/a/amdgpu-install/amdgpu-install_31.60.0.0.31600000-2407772.26.04_all.deb
 
-# 3. Restart the Docker daemon to apply runtime changes
+sudo apt install ./amdgpu-install_31.60.0.0.31600000-2407772.26.04_all.deb 
+
+sudo apt update
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/amd-container-toolkit.gpg] https://repo.radeon.com/amdgpu/latest/ubuntu noble main" > /etc/apt/sources.list.d/amd-container-toolkit.list
+
+wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
+
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/amd-container-toolkit/apt/ $(. /etc/os-release && echo $VERSION_CODENAME) main" | sudo tee /etc/apt/sources.list.d/amd-container-toolkit.list
+
+sudo apt update
+
+sudo apt install amd-container-toolkit
+
+# 3. Register the AMD container runtime and restart the Docker daemon:
+sudo amd-ctk runtime configure
 sudo systemctl restart docker
 ```
 
