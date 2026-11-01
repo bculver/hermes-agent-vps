@@ -238,7 +238,7 @@ docker run -it --rm \
    
 2. Paste the following configuration:
    ```yaml
-    version: '3.8'
+    version: '3.9'
     
     services:
       ollama:
@@ -249,19 +249,25 @@ docker run -it --rm \
           - no-new-privileges:true
         # Maps all or specific AMD GPU devices into the container natively via Docker 28/29 CDI
         devices:
-          - amd.com/gpu=all
+          - /dev/kfd
+          - /dev/dri
+        #  - amd.com/gpu=all
+        group_add:
+          - "44"
+          - "992"
         volumes:
           - ollama_storage:/root/.ollama
         networks:
           - ai-private-net
         environment:
           - OLLAMA_HOST=0.0.0.0
-          - HSA_OVERRIDE_GFX_VERSION=11.0.0 # Force fallback if standard ROCm runtime requires it for Radeon consumer cards
     
       hermes-agent:
-        image: ghcr.io/nousresearch/hermes-agent:latest
+        image: nousresearch/hermes-agent:latest
         container_name: hermes-agent-service
         restart: always
+        command: gateway run
+        shm_size: "1g"
         security_opt:
           - no-new-privileges:true
         ports:
@@ -287,6 +293,7 @@ docker run -it --rm \
         driver: local
       hermes_data:
         driver: local
+
    ```
 
 3. Save and close (`Ctrl+O`, `Enter`, `Ctrl+X`).
