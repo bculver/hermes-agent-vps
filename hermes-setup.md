@@ -323,7 +323,7 @@ docker compose up -d
 ```
 
 ### 14. Cache Your Heavyweight LLM
-Maximize your 110 GB VRAM pipeline by running a state-of-the-art 72B parameter model. Instruct Ollama to download and optimize it natively:
+Maximize your 96 GB VRAM pipeline by running a state-of-the-art 72B parameter model. Instruct Ollama to download and optimize it natively:
 
 ```bash
 docker exec -it hermes-ollama-backend ollama run qwen2.5:72b
