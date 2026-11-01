@@ -237,54 +237,55 @@ docker run -it --rm \
    ```
 2. Paste the following configuration:
    ```yaml
-   version: '3.8'
+version: '3.8'
 
-   services:
-     ollama:
-       image: ollama/ollama:latest
-       container_name: hermes-ollama-backend
-       volumes:
-         - ollama_storage:/root/.ollama
-       ports:
-         - "11434:11434"
-       networks:
-         - hermes-isolated-net
-       deploy:
-         resources:
-           reservations:
-             devices:
-               - driver: nvidia
-                 count: all
-                 capabilities: [gpu]
-       restart: unless-stopped
+services:
+  ollama:
+    image: ollama/ollama:rocm
+    container_name: ollama-backend
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    # Maps all or specific AMD GPU devices into the container natively via Docker 28/29 CDI
+    devices:
+      - amd.com/gpu=all
+    volumes:
+      - ollama_storage:/root/.ollama
+    networks:
+      - ai-private-net
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - HSA_OVERRIDE_GFX_VERSION=11.0.0 # Force fallback if standard ROCm runtime requires it for Radeon consumer cards
 
-     hermes-agent:
-       image: nousresearch/hermes-agent:latest
-       container_name: hermes-sandbox-env
-       user: "2026:2026"
-       depends_on:
-         - ollama
-       networks:
-         - hermes-isolated-net
-       environment:
-         - OLLAMA_HOST=http://ollama:11434
-         - AGENT_MODEL=qwen2.5:72b
-         - HOME=/workspace
-       volumes:
-         - ./workspace:/workspace
-       stdin_open: true 
-       tty: true
-       restart: unless-stopped
+  hermes-agent:
+    image: ghcr.io/nousresearch/hermes-agent:latest
+    container_name: hermes-agent-service
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:8642:8642"   # Clamps Hermes API Gateway to local host only for security
+      - "127.0.0.1:9119:9119"   # Clamps Dashboard locally (requires SSH tunneling / reverse proxy)
+    volumes:
+      - hermes_data:/opt/data
+    networks:
+      - ai-private-net
+    environment:
+      - OLLAMA_BASE_URL=http://ollama-backend:11434
+      - HERMES_DASHBOARD=1
+    depends_on:
+      - ollama
 
-   networks:
-     hermes-isolated-net:
-       driver: bridge
-       ipam:
-         config:
-           - subnet: 172.28.0.0/16
+networks:
+  ai-private-net:
+    driver: bridge
+    internal: false # Change to true if Hermes does not need external APIs (e.g. OpenAI/Anthropic/Web Search)
 
-   volumes:
-     ollama_storage:
+volumes:
+  ollama_storage:
+    driver: local
+  hermes_data:
+    driver: local
    ```
 3. Save and close (`Ctrl+O`, `Enter`, `Ctrl+X`).
 
