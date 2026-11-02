@@ -330,10 +330,10 @@ docker compose up -d
 ```
 
 ### 14. Cache Your Heavyweight LLM
-Maximize your 96 GB VRAM pipeline by running a state-of-the-art 72B parameter model. Instruct Ollama to download and optimize it natively:
+Maximize your 96 GB VRAM pipeline by running a 72B parameter model. Instruct Ollama to download and optimize it natively:
 
 ```bash
-docker exec -it hermes-ollama-backend ollama run qwen2.5:72b
+docker exec -it ollama-backend ollama run qwen2.5:72b
 ```
 *(Once the download completes and displays a chat prompt, type `/exit` to return to your normal terminal).*
 
@@ -342,7 +342,7 @@ Drop into your isolated sandbox container to run the initialization scripts. Bec
 
 ```bash
 # 1. Execute onboarding wizard
-docker exec -it hermes-sandbox-env hermes config setup
+docker exec -it hermes-agent-service hermes config setup
 ```
 Select the following responses in the setup guide:
 * **Model Provider:** `Ollama local` or `Custom Endpoint`
@@ -352,5 +352,5 @@ Select the following responses in the setup guide:
 
 Next, adjust the agent's context window settings to ensure it can successfully handle complex multi-step reasoning thoughts:
 ```bash
-docker exec -it hermes-sandbox-env hermes config set model.context_length 65536
+docker exec -it hermes-agent-service hermes config set model.context_length 65536
 ```
